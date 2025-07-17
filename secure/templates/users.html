@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Check that the user is even logged in and that they have the permissions to view this page -->
+{% if user.is_authenticated %}
+    {% if viewer %}
+        <p>USER: {{ usersearch }}</p>
+        <!-- Check that the user also has permissions to edit the page -->
+        <!-- We already know they are logged in and can view from previous if -->
+        {% if editor %}
+            <form action="{% url 'namechange' user.id %}" method="post">
+            {% csrf_token %}
+            <fieldset>
+                <legend><h1>{{ usersearch }}</h1></legend>
+                {% if error_message %}<p><strong>{{ error_message }}</strong></p>{% endif %}
+                <label for="uname">Name: </label>
+                <input type="text" id="uname" name="uname" value="">
+            </fieldset>
+            <input type="submit" value="Change name">
+            </form>
+        {% endif %}
+    {% else %}
+        <!-- If they don't have view permissions, show them that -->
+        <p>You do not have permission to view this page</p>
+    {% endif %}
+{% else %}
+<!-- If they are not allowed to view at all, show login page -->
+<!-- Could also redirect to login page -->
+<p>You are not logged in</p>
+<a href="{% url 'login' %}">Log In</a>
+<a href="{% url 'signup' %}">Sign Up</a>
+{% endif %}
+{% endblock %}
