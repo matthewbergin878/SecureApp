@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Storefront</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        h1 {
+            color: #461E96;
+        }
+        .product {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .product h2 {
+            color: #00B4E6;
+        }
+        .product p {
+            margin: 5px 0;
+        }
+        .product button {
+            padding: 10px;
+            background-color: #461E96;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .product button:hover {
+            background-color: #735CCC;
+        }
+    </style>
+</head>
+<body>
+    <h1>Storefront</h1>
+    <div id="products"></div>
+
+    <script>
+        const API_BASE_URL = 'http://127.0.0.1:5000';
+
+        // Fetch and display all products
+        async function fetchProducts() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/products`);
+                const products = await response.json();
+
+                const productsDiv = document.getElementById('products');
+                productsDiv.innerHTML = '';
+
+                products.forEach(product => {
+                    const productDiv = document.createElement('div');
+                    productDiv.className = 'product';
+
+                    productDiv.innerHTML = `
+                        <h2>${product.product_name}</h2>
+                        <p>${product.description}</p>
+                        <p>Price: $${product.price.toFixed(2)}</p>
+                        <p>Stock: ${product.stock}</p>
+                        <button onclick="purchaseProduct(${product.id})" ${product.stock <= 0 ? 'disabled' : ''}>
+                            ${product.stock > 0 ? 'Purchase' : 'Out of Stock'}
+                        </button>
+                    `;
+
+                    productsDiv.appendChild(productDiv);
+                });
+            } catch (error) {
+                console.error('Error fetching products:', error);
+                alert('Failed to fetch products. Please try again later.');
+            }
+        }
+
+        // Handle product purchase
+        async function purchaseProduct(productId) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/purchase/${productId}`, {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    alert('Purchase successful!');
+                    fetchProducts(); // Refresh product list
+                } else {
+                    const errorData = await response.json();
+                    alert(`Purchase failed: ${errorData.error}`);
+                }
+            } catch (error) {
+                console.error('Error purchasing product:', error);
+                alert('Failed to complete the purchase. Please try again later.');
+            }
+        }
+
+        // Fetch products on page load
+        fetchProducts();
+    </script>
+</body>
+</html>
