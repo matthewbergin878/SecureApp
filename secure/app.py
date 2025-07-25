@@ -16,6 +16,8 @@ csrf.init_app(app)
 # Configure CORS to allow cookies
 CORS(app, supports_credentials=True)
 
+csrf._csrf_disable_on_get = False
+
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
