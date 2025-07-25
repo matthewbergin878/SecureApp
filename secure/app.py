@@ -27,8 +27,14 @@ def fetch_products():
 # Route to fetch a specific product by ID
 @app.route('/product/<int:product_id>', methods=['GET'])
 def fetch_product(product_id):
+    id = 0
+    try:
+        id = int(product_id)
+    except ValueError as e:
+        return jsonify({'error': 'Product not found'}), 404
+    
     conn = get_db_connection()
-    product = conn.execute('SELECT * FROM products WHERE id = ?', (product_id,)).fetchone()
+    product = conn.execute('SELECT * FROM products WHERE id = ?', (id,)).fetchone()
     conn.close()
 
     if product is None:
@@ -153,4 +159,4 @@ if __name__ == '__main__':
     conn.close()
 
     # Run the Flask app
-    app.run(debug=True)
+    app.run(debug=False)
