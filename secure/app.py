@@ -1,10 +1,24 @@
-from flask import Flask, jsonify, request
-from flask_cors import CORS, cross_origin
+from flask import Flask, jsonify, request, render_template
+from flask_cors import CORS
+from flask_seasurf import SeaSurf
 import sqlite3
+import secrets
+import logging
 
 # Initialize Flask app
-app = Flask(__name__)
-CORS(app)
+app = Flask(__name__, template_folder='templates')
+secret = secrets.token_urlsafe(32)
+
+app.secret_key = secret
+csrf = SeaSurf(app)
+csrf.init_app(app)
+
+# Configure CORS to allow cookies
+CORS(app, supports_credentials=True)
+
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
 
 # Database setup
 DATABASE = 'storefront.db'
@@ -14,7 +28,33 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row 
     return conn
 
-# Route to fetch all products
+@app.errorhandler(403)
+def csrf_error(e):
+    # Log details about the CSRF validation failure
+    app.logger.error("CSRF validation failed.")
+    app.logger.error(f"Request method: {request.method}")
+    app.logger.error(f"Request headers: {request.headers}")
+    app.logger.error(f"Request cookies: {request.cookies}")
+    app.logger.error(f"X-CSRFToken header: {request.headers.get('X-CSRFToken')}")
+    return jsonify({'error': 'CSRF token missing or incorrect.'}), 403
+
+@app.route('/')
+def serve_frontend():
+    # Serve the updated storefront HTML file
+    return render_template('storefront.html')
+
+@app.route('/csrf-token', methods=['GET'])
+def get_csrf_token():
+    # Log all cookies received in the request
+    app.logger.debug(f"Cookies received: {request.cookies}")
+    
+    # Log the CSRF token specifically
+    csrf_token = request.cookies.get('_csrf_token')
+    app.logger.debug(f"CSRF Token from cookie: {csrf_token}")
+    
+    return jsonify({'csrf_token': csrf_token})
+
+
 @app.route('/products', methods=['GET'])
 def fetch_products():
     conn = get_db_connection()
@@ -24,80 +64,28 @@ def fetch_products():
     product_list = [dict(product) for product in products]
     return jsonify(product_list)
 
-# Route to fetch a specific product by ID
-@app.route('/product/<int:product_id>', methods=['GET'])
-def fetch_product(product_id):
-    id = 0
-    try:
-        id = int(product_id)
-    except ValueError as e:
-        return jsonify({'error': 'Product not found'}), 404
-    
-    conn = get_db_connection()
-    product = conn.execute('SELECT * FROM products WHERE id = ?', (id,)).fetchone()
-    conn.close()
-
-    if product is None:
-        return jsonify({'error': 'Product not found'}), 404
-
-    return jsonify(dict(product))
-
-# Route to add a new product
-@app.route('/product', methods=['POST'])
-def add_product():
-    new_product = request.get_json()
-    product_name = new_product.get('product_name')
-    description = new_product.get('description')
-    price = new_product.get('price')
-    stock = new_product.get('stock')
-
-    if not all([product_name, price, stock]):
-        return jsonify({'error': 'Missing required fields'}), 400
-
-    conn = get_db_connection()
-    conn.execute(
-        'INSERT INTO products (product_name, description, price, stock) VALUES (?, ?, ?, ?)',
-        (product_name, description, price, stock)
-    )
-    conn.commit()
-    conn.close()
-
-    return jsonify({'message': 'Product added successfully'}), 201
-
-# Route to update a product
-@app.route('/product/<int:product_id>', methods=['PUT'])
-def update_product(product_id):
-    updated_product = request.get_json()
-    product_name = updated_product.get('product_name')
-    description = updated_product.get('description')
-    price = updated_product.get('price')
-    stock = updated_product.get('stock')
-
-    conn = get_db_connection()
-    conn.execute(
-        'UPDATE products SET product_name = ?, description = ?, price = ?, stock = ? WHERE id = ?',
-        (product_name, description, price, stock, product_id)
-    )
-    conn.commit()
-    conn.close()
-
-    return jsonify({'message': 'Product updated successfully'})
-
-# Route to delete a product
-@app.route('/product/<int:product_id>', methods=['DELETE'])
-def delete_product(product_id):
-    conn = get_db_connection()
-    conn.execute('DELETE FROM products WHERE id = ?', (product_id,))
-    conn.commit()
-    conn.close()
-
-    return jsonify({'message': 'Product deleted successfully'})
-
 @app.route('/purchase/<int:product_id>', methods=['POST'])
 def purchase_product(product_id):
     conn = get_db_connection()
     
     try:
+        # Log the request method
+        app.logger.debug(f"Request method: {request.method}")
+        
+        # Log the request headers
+        app.logger.debug(f"Request headers: {request.headers}")
+        
+        # Log the request body
+        app.logger.debug(f"Request body: {request.get_data(as_text=True)}")
+        
+        # Log the CSRF token received in the request header
+        csrf_token_header = request.headers.get('X-CSRFToken')
+        app.logger.debug(f"CSRF Token from header: {csrf_token_header}")
+
+        # Log the CSRF token from the cookie
+        csrf_token_cookie = request.cookies.get('_csrf_token')
+        app.logger.debug(f"CSRF Token from cookie: {csrf_token_cookie}")
+
         # Fetch the product by ID
         product = conn.execute('SELECT * FROM products WHERE id = ?', (product_id,)).fetchone()
         
@@ -126,14 +114,10 @@ def purchase_product(product_id):
         })
         response.status_code = 200
 
-        # Add CORS headers manually
-        response.headers.add("Access-Control-Allow-Origin", "*")
-        response.headers.add("Access-Control-Allow-Headers", "*")
-        response.headers.add("Access-Control-Allow-Methods", "*")
-
         return response
 
     except Exception as e:
+        app.logger.error(f"Error in purchase_product: {e}")
         return jsonify({'error': str(e)}), 500
 
     finally:
@@ -152,9 +136,6 @@ if __name__ == '__main__':
         price REAL NOT NULL, 
         stock INTEGER NOT NULL
     );""")
-    # conn.execute('INSERT INTO products (product_name, description, price, stock) VALUES (?, ?, ?, ?)', ('Laptop', 'A high-performance laptop', 999.99, 10))
-    # conn.execute('INSERT INTO products (product_name, description, price, stock) VALUES (?, ?, ?, ?)', ('Smartphone', 'A latest-gen smartphone', 699.99, 25))
-    # conn.execute('INSERT INTO products (product_name, description, price, stock) VALUES (?, ?, ?, ?)', ('Headphones', 'Noise-cancelling headphones', 199.99, 50))
     conn.commit()
     conn.close()
 

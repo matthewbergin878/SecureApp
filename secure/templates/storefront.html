@@ -45,7 +45,24 @@
     <div id="products"></div>
 
     <script>
-        const API_BASE_URL = 'http://127.0.0.1:5000';
+        // Base URL for API calls (relative to the backend)
+        const API_BASE_URL = '';
+
+        let csrfToken = null;
+
+        // Fetch the CSRF token
+        async function fetchCsrfToken() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/csrf-token`, {
+                    credentials: 'include' // Include cookies in the request
+                });
+                const data = await response.json();
+                csrfToken = data.csrf_token;
+            } catch (error) {
+                console.error('Error fetching CSRF token:', error);
+                alert('Failed to fetch CSRF token. Please try again later.');
+            }
+        }
 
         // Fetch and display all products
         async function fetchProducts() {
@@ -82,7 +99,12 @@
         async function purchaseProduct(productId) {
             try {
                 const response = await fetch(`${API_BASE_URL}/purchase/${productId}`, {
-                    method: 'POST'
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken // Include CSRF token in the headers
+                    },
+                    credentials: 'include' // Include cookies in the request
                 });
 
                 if (response.ok) {
@@ -98,8 +120,8 @@
             }
         }
 
-        // Fetch products on page load
-        fetchProducts();
+        // Fetch CSRF token and products on page load
+        fetchCsrfToken().then(fetchProducts);
     </script>
 </body>
 </html>
