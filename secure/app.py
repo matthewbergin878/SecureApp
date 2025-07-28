@@ -68,18 +68,10 @@ def fetch_products():
 
 @app.route('/purchase/<int:product_id>', methods=['POST'])
 def purchase_product(product_id):
+    id = str(product_id)
     conn = get_db_connection()
     
     try:
-        # Log the request method
-        app.logger.debug(f"Request method: {request.method}")
-        
-        # Log the request headers
-        app.logger.debug(f"Request headers: {request.headers}")
-        
-        # Log the request body
-        app.logger.debug(f"Request body: {request.get_data(as_text=True)}")
-        
         # Log the CSRF token received in the request header
         csrf_token_header = request.headers.get('X-CSRFToken')
         app.logger.debug(f"CSRF Token from header: {csrf_token_header}")
@@ -89,6 +81,12 @@ def purchase_product(product_id):
         app.logger.debug(f"CSRF Token from cookie: {csrf_token_cookie}")
 
         # Fetch the product by ID
+        if not id.isdigit():
+            app.logger.error(f"Invalid product_id: {id}")
+            return jsonify({'error': 'Invalid product ID'}), 400
+
+        product_id = int(id)
+
         product = conn.execute('SELECT * FROM products WHERE id = ?', (product_id,)).fetchone()
         
         if product is None:
