@@ -64,8 +64,17 @@ def fetch_products():
     products = conn.execute('SELECT * FROM products').fetchall()
     conn.close()
 
-    product_list = [dict(product) for product in products]
-    return jsonify(product_list)
+    sanitized_products = []
+    for product in products:
+        sanitized_products.append({
+            'id': product['id'],
+            'product_name': html.escape(product['product_name']),
+            'description': html.escape(product['description']),
+            'price': product['price'],
+            'stock': product['stock']
+        })
+
+    return jsonify(sanitized_products)
 
 @app.route('/purchase/<int:product_id>', methods=['POST'])
 def purchase_product(product_id):
