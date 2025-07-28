@@ -106,11 +106,11 @@ def purchase_product(product_id):
             return jsonify({'error': 'Product not found'}), 404
         
         sanitized_product = {
-            'id': product['id'],
+            'id': int(product['id']),
             'product_name': html.escape(product['product_name']),
             'description': html.escape(product['description']),
-            'price': product['price'],
-            'stock': product['stock']
+            'price': float(product['price']),
+            'stock': int(product['stock'])
         }
 
         # Check if stock is available
