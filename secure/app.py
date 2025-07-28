@@ -4,6 +4,7 @@ from flask_seasurf import SeaSurf
 import sqlite3
 import secrets
 import logging
+import html
 
 # Initialize Flask app
 app = Flask(__name__, template_folder='templates')
@@ -91,13 +92,21 @@ def purchase_product(product_id):
         
         if product is None:
             return jsonify({'error': 'Product not found'}), 404
+        
+        sanitized_product = {
+            'id': product['id'],
+            'product_name': html.escape(product['product_name']),
+            'description': html.escape(product['description']),
+            'price': product['price'],
+            'stock': product['stock']
+        }
 
         # Check if stock is available
-        if product['stock'] <= 0:
+        if sanitized_product['stock'] <= 0:
             return jsonify({'error': 'Product is out of stock'}), 400
 
         # Reduce stock by 1
-        new_stock = product['stock'] - 1
+        new_stock = sanitized_product['stock'] - 1
         conn.execute('UPDATE products SET stock = ? WHERE id = ?', (new_stock, product_id))
         conn.commit()
 
@@ -105,10 +114,10 @@ def purchase_product(product_id):
         response = jsonify({
             'message': 'Purchase successful',
             'product': {
-                'id': product['id'],
-                'product_name': product['product_name'],
-                'description': product['description'],
-                'price': product['price'],
+                'id': sanitized_product['id'],
+                'product_name': sanitized_product['product_name'],
+                'description': sanitized_product['description'],
+                'price': sanitized_product['price'],
                 'stock': new_stock
             }
         })
