@@ -55,7 +55,7 @@ def get_csrf_token():
     csrf_token = request.cookies.get('_csrf_token')
     app.logger.debug(f"CSRF Token from cookie: {csrf_token}")
     
-    return jsonify({'csrf_token': csrf_token})
+    return jsonify({'csrf_token': html.escape(csrf_token)})
 
 
 @app.route('/products', methods=['GET'])
