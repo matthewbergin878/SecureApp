@@ -66,13 +66,16 @@ def fetch_products():
 
     sanitized_products = []
     for product in products:
-        sanitized_products.append({
-            'id': product['id'],
-            'product_name': html.escape(product['product_name']),
-            'description': html.escape(product['description']),
-            'price': product['price'],
-            'stock': product['stock']
-        })
+        try:
+            sanitized_products.append({
+                'id': int(product['id']),
+                'product_name': html.escape(product['product_name']),
+                'description': html.escape(product['description']),
+                'price': float(product['price']),
+                'stock': int(product['stock'])
+            })
+        except ValueError as e:
+            app.logger.error("Invalid project "+ str(e))
 
     return jsonify(sanitized_products)
 
