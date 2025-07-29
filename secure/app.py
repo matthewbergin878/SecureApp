@@ -5,6 +5,7 @@ import sqlite3
 import secrets
 import logging
 import html
+from flask_talisman import Talisman
 
 # Initialize Flask app
 app = Flask(__name__, template_folder='templates')
@@ -16,6 +17,8 @@ csrf.init_app(app)
 
 # Configure CORS to allow cookies
 CORS(app, supports_credentials=True)
+
+Talisman(app, strict_transport_security=True)
 
 csrf._csrf_disable_on_get = False
 
@@ -165,4 +168,4 @@ if __name__ == '__main__':
     conn.close()
 
     # Run the Flask app
-    app.run(debug=False)
+    app.run(debug=False, ssl_context='adhoc')
