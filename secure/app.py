@@ -144,6 +144,10 @@ def purchase_product(product_id):
     finally:
         conn.close()
 
+@app.after_request
+def add_header(response):
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    return response
 
 
 # Main entry point
