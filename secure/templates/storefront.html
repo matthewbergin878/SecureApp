@@ -50,6 +50,8 @@
 
         let csrfToken = null;
 
+        const session_id = Math.floor(Math.random() * 99999999);
+
         // Fetch the CSRF token
         async function fetchCsrfToken() {
             try {

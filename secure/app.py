@@ -6,6 +6,7 @@ import secrets
 import logging
 import html
 from flask_talisman import Talisman
+import hashlib
 
 # Initialize Flask app
 app = Flask(__name__, template_folder='templates')
@@ -18,7 +19,7 @@ csrf.init_app(app)
 # Configure CORS to allow cookies
 CORS(app, supports_credentials=True)
 
-Talisman(app, strict_transport_security=True)
+# Talisman(app, strict_transport_security=True)
 
 csrf._csrf_disable_on_get = False
 
@@ -55,7 +56,7 @@ def get_csrf_token():
     app.logger.debug(f"Cookies received: {request.cookies}")
     
     # Log the CSRF token specifically
-    csrf_token = request.cookies.get('_csrf_token')
+    csrf_token = csrf._get_token()
     app.logger.debug(f"CSRF Token from cookie: {csrf_token}")
     
     return jsonify({'csrf_token': html.escape(csrf_token)})
@@ -168,4 +169,5 @@ if __name__ == '__main__':
     conn.close()
 
     # Run the Flask app
-    app.run(debug=False, ssl_context='adhoc')
+    # app.run(debug=False, ssl_context='adhoc')
+    app.run(debug=False)
