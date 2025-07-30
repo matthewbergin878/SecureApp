@@ -6,7 +6,6 @@ import secrets
 import logging
 import html
 from flask_talisman import Talisman
-import hashlib
 
 # Initialize Flask app
 app = Flask(__name__, template_folder='templates')
