@@ -51,22 +51,19 @@ def serve_frontend():
 
 @app.route('/csrf-token', methods=['GET'])
 def get_csrf_token():
-    # Log all cookies received in the request
-    app.logger.debug(f"Cookies received: {request.cookies}")
-    
-    # Log the CSRF token specifically
     csrf_token = csrf._get_token()
-    app.logger.debug(f"CSRF Token from cookie: {csrf_token}")
     
     return jsonify({'csrf_token': html.escape(csrf_token)})
 
 
 @app.route('/products', methods=['GET'])
 def fetch_products():
+    #get all products from the database
     conn = get_db_connection()
     products = conn.execute('SELECT * FROM products').fetchall()
     conn.close()
 
+    #ensure all products have safe values, no stored xss
     sanitized_products = []
     for product in products:
         try:
@@ -78,7 +75,7 @@ def fetch_products():
                 'stock': int(product['stock'])
             })
         except ValueError as e:
-            app.logger.error("Invalid project "+ str(e))
+            app.logger.error("Invalid product "+ str(e))
 
     return jsonify(sanitized_products)
 
@@ -88,26 +85,21 @@ def purchase_product(product_id):
     conn = get_db_connection()
     
     try:
-        # Log the CSRF token received in the request header
-        csrf_token_header = request.headers.get('X-CSRFToken')
-        app.logger.debug(f"CSRF Token from header: {csrf_token_header}")
-
-        # Log the CSRF token from the cookie
-        csrf_token_cookie = request.cookies.get('_csrf_token')
-        app.logger.debug(f"CSRF Token from cookie: {csrf_token_cookie}")
-
         # Fetch the product by ID
+        #validate the prodcut_id first just in case
         if not id.isdigit():
             app.logger.error(f"Invalid product_id: {id}")
             return jsonify({'error': 'Invalid product ID'}), 400
 
         product_id = int(id)
 
+        #get the product from the database
         product = conn.execute('SELECT * FROM products WHERE id = ?', (product_id,)).fetchone()
         
         if product is None:
             return jsonify({'error': 'Product not found'}), 404
         
+        #ensure all the data is safe
         sanitized_product = {
             'id': int(product['id']),
             'product_name': html.escape(product['product_name']),
@@ -149,11 +141,11 @@ def purchase_product(product_id):
 
 @app.after_request
 def add_header(response):
+    #add secure headers to responses
     response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
     return response
 
 
-# Main entry point
 if __name__ == '__main__':
     # Create the database and add sample data if it doesn't exist
     conn = sqlite3.connect(DATABASE)
@@ -167,6 +159,5 @@ if __name__ == '__main__':
     conn.commit()
     conn.close()
 
-    # Run the Flask app
-    # app.run(debug=False, ssl_context='adhoc') , ssl_context=('cert.pem', 'key.pem')
+    #run app
     app.run(debug=False, ssl_context='adhoc')
