@@ -1,16 +1,18 @@
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, request, render_template, session
 from flask_cors import CORS
 from flask_seasurf import SeaSurf
 import sqlite3
 import secrets
 import logging
 import html
+import bcrypt
 from flask_talisman import Talisman
 
 # Initialize Flask app
 app = Flask(__name__, template_folder='templates')
 secret = secrets.token_urlsafe(32)
 
+#CSRF protections
 app.secret_key = secret
 csrf = SeaSurf(app)
 csrf.init_app(app)
@@ -18,8 +20,10 @@ csrf.init_app(app)
 # Configure CORS to allow cookies
 CORS(app, supports_credentials=True)
 
+#more csrf protections
 Talisman(app, strict_transport_security=True, content_security_policy=None)
 
+#require csrf token for get requests too
 csrf._csrf_disable_on_get = False
 
 
@@ -34,6 +38,25 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row 
     return conn
 
+def add_user(conn, username, password, salt, answer):
+    if len(get_user(conn, username)) != 0:
+        print("User already exists")
+        return False
+    sql = "INSERT INTO users(name, password, salt, email) VALUES(?,?,?,?)"
+    cur = conn.cursor()
+    cur.execute(sql, (username, password, salt, answer))
+    conn.commit()
+    return True
+
+def get_user(conn, username):
+    sql = "SELECT * FROM users WHERE name=?"
+    cur = conn.cursor()
+    cur.execute(sql, (username,))
+    rows = cur.fetchall()
+    # for row in rows:
+    #     print(row)
+    return rows
+
 @app.errorhandler(403)
 def csrf_error(e):
     # Log details about the CSRF validation failure
@@ -47,13 +70,101 @@ def csrf_error(e):
 @app.route('/')
 def serve_frontend():
     # Serve the updated storefront HTML file
-    return render_template('storefront.html')
+    return render_template('storefront.html')  
+
+
 
 @app.route('/csrf-token', methods=['GET'])
 def get_csrf_token():
     csrf_token = csrf._get_token()
     
     return jsonify({'csrf_token': html.escape(csrf_token)})
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'GET':
+        csrf_token = csrf._get_token()
+        app.logger.debug(f"Generated CSRF Token (from /register GET): {csrf_token}")
+        return render_template('register.html', csrf_token=csrf_token)
+
+    if request.method == 'POST':
+
+        # Get the CSRF token from the headers
+        received_csrf_token = request.headers.get('X-CSRFToken')
+
+        expected_csrf_token = csrf._get_token()
+
+        # Validate the CSRF token
+        if received_csrf_token != expected_csrf_token:
+            return jsonify({'error': 'CSRF token missing or incorrect.'}), 403
+
+        username = request.json.get('username')
+        password = request.json.get('password')
+        confirm_password = request.json.get('confirm_password')
+
+        if password != confirm_password:
+            return jsonify({'error': 'Passwords do not match'}), 400
+        
+        salt = bcrypt.gensalt()
+
+        hashed_password = bcrypt.hashpw(password.encode('utf-8'), salt)
+
+        conn = get_db_connection()
+        try:
+            conn.execute(
+                'INSERT INTO users (username, password, salt) VALUES (?, ?, ?)',
+                (username, hashed_password, salt)
+            )
+            conn.commit()
+        except sqlite3.IntegrityError:
+            return jsonify({'error': 'Username already exists'}), 400
+        finally:
+            conn.close()
+
+        return jsonify({'message': 'Registration successful'}), 200
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'GET':
+        csrf_token = csrf._get_token()
+        app.logger.debug(f"Generated CSRF Token (from /login GET): {csrf_token}")
+        return render_template('login.html', csrf_token=csrf_token)
+
+    if request.method == 'POST':
+        # Log the request headers
+        app.logger.debug(f"Request Headers: {request.headers}")
+
+        # Get the CSRF token from the headers
+        received_csrf_token = request.headers.get('X-CSRFToken')
+        app.logger.debug(f"Received CSRF Token (from /login POST): {received_csrf_token}")
+
+        # Log the expected CSRF token
+        expected_csrf_token = csrf._get_token()
+        app.logger.debug(f"Expected CSRF Token (from /login POST): {expected_csrf_token}")
+
+        # Validate the CSRF token
+        if received_csrf_token != expected_csrf_token:
+            return jsonify({'error': 'CSRF token missing or incorrect.'}), 403
+
+        # Login logic continues here...
+        username = request.json.get('username')
+        password = request.json.get('password')
+
+        conn = get_db_connection()
+        user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+        conn.close()
+
+        if user is None:
+            return jsonify({'error': 'Invalid username or password'}), 401
+
+        hashed_password = user['password']
+        if not bcrypt.checkpw(password.encode('utf-8'), hashed_password):
+            return jsonify({'error': 'Invalid username or password'}), 401
+
+        session['user_id'] = user['id']
+        session['username'] = user['username']
+
+        return jsonify({'message': 'Login successful'}), 200
 
 
 @app.route('/products', methods=['GET'])
@@ -146,6 +257,7 @@ def add_header(response):
     return response
 
 
+
 if __name__ == '__main__':
     # Create the database and add sample data if it doesn't exist
     conn = sqlite3.connect(DATABASE)
@@ -155,6 +267,12 @@ if __name__ == '__main__':
         description TEXT, 
         price REAL NOT NULL, 
         stock INTEGER NOT NULL
+    );""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY, 
+        username TEXT NOT NULL, 
+        password BLOB NOT NULL, 
+        salt BLOB NOT NULL
     );""")
     conn.commit()
     conn.close()
