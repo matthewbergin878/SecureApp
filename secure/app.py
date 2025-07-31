@@ -1,4 +1,5 @@
-from flask import Flask, jsonify, request, render_template, session
+from flask import Flask, jsonify, request, render_template, session, redirect, url_for
+from functools import wraps
 from flask_cors import CORS
 from flask_seasurf import SeaSurf
 import sqlite3
@@ -56,6 +57,21 @@ def get_user(conn, username):
     # for row in rows:
     #     print(row)
     return rows
+
+def is_authenticated():
+    return 'user_id' in session
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            # Return a JSON error response for API routes
+            if request.is_json:
+                return jsonify({'error': 'Authentication required'}), 401
+            # Redirect to the login page for non-API routes
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 @app.errorhandler(403)
 def csrf_error(e):
@@ -161,10 +177,13 @@ def login():
         if not bcrypt.checkpw(password.encode('utf-8'), hashed_password):
             return jsonify({'error': 'Invalid username or password'}), 401
 
+        # Set the session for the logged-in user
         session['user_id'] = user['id']
         session['username'] = user['username']
 
-        return jsonify({'message': 'Login successful'}), 200
+        # Return a redirect response to the home page
+        return jsonify({'message': 'Login successful', 'redirect_url': '/'}), 200
+
 
 
 @app.route('/products', methods=['GET'])
@@ -190,7 +209,9 @@ def fetch_products():
 
     return jsonify(sanitized_products)
 
+
 @app.route('/purchase/<int:product_id>', methods=['POST'])
+@login_required
 def purchase_product(product_id):
     id = str(product_id)
     conn = get_db_connection()
