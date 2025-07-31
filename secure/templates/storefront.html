@@ -11,8 +11,26 @@
             padding: 0;
             background-color: #f4f4f4;
         }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
         h1 {
             color: #461E96;
+        }
+        .login-button {
+            padding: 10px 15px;
+            background-color: #461E96;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .login-button:hover {
+            background-color: #735CCC;
         }
         .product {
             margin-bottom: 20px;
@@ -41,7 +59,13 @@
     </style>
 </head>
 <body>
-    <h1>Storefront</h1>
+    <header>
+        <h1>Storefront</h1>
+        <div>
+            <button class="login-button" onclick="handleLogin()">Login</button>
+            <button class="login-button" onclick="handleRegister()">Register</button>
+        </div>
+    </header>
     <div id="products"></div>
 
     <script>
@@ -120,6 +144,14 @@
                 console.error('Error purchasing product:', error);
                 alert('Failed to complete the purchase. Please try again later.');
             }
+        }
+
+        // Handle login button click
+        function handleLogin() {
+            window.location.href = '/login'; // Redirect to the /login page
+        }
+        function handleRegister() {
+            window.location.href = '/register'; // Redirect to the /register page
         }
 
         // Fetch CSRF token and products on page load
